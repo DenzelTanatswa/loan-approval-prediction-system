@@ -114,6 +114,7 @@ with st.sidebar:
     st.markdown("## 🏦 Loan Advisor")
     st.markdown("---")
     st.markdown('<div class="sidebar-section">👤 Applicant Info</div>', unsafe_allow_html=True)
+    applicant_name = st.text_input("Full Name", value=st.session_state.get("applicant_name_input", ""), placeholder="e.g. John Smith")
     dependents    = st.number_input("Dependents", min_value=0, max_value=10, value=0)
     education     = st.selectbox("Education", ["Graduate", "Not Graduate"])
     self_employed = st.selectbox("Employment", ["No", "Yes"],
@@ -169,7 +170,14 @@ with tab1:
     with t5: st.markdown(f'<div class="tile"><div class="val">{cibil_score} <span class="risk-badge {risk_class}">{risk_label}</span></div><div class="lbl">CIBIL Score</div></div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    predict = st.button("🔍 Run Credit Assessment")
+    col_predict, col_reset = st.columns([3, 1])
+    with col_predict:
+        predict = st.button("🔍 Run Credit Assessment")
+    with col_reset:
+        if st.button("🔄 Reset"):
+            for key in ["prob_approve", "prob_reject", "prediction", "confidence", "input_df", "timestamp", "prediction_done", "applicant_name_input"]:
+                st.session_state.pop(key, None)
+            st.rerun()
 
 # ── Tab 2 ─────────────────────────────────────────────────────────────────────
 with tab2:
@@ -189,17 +197,20 @@ with tab2:
         input_df     = st.session_state.input_df
         timestamp    = st.session_state.timestamp
 
+        applicant_name = st.session_state.get("applicant_name_input", "")
+        name_display   = f" — {applicant_name}" if applicant_name else ""
+
         # Result banner
         if pred == 1:
             st.markdown(f"""
             <div class="result-approved">
-                <div class="result-title">✅ Loan Approved</div>
+                <div class="result-title">✅ Loan Approved{name_display}</div>
                 <div class="result-sub">Applicant meets all credit criteria &nbsp;·&nbsp; Assessed: <strong>{timestamp}</strong></div>
             </div>""", unsafe_allow_html=True)
         else:
             st.markdown(f"""
             <div class="result-rejected">
-                <div class="result-title">❌ Loan Rejected</div>
+                <div class="result-title">❌ Loan Rejected{name_display}</div>
                 <div class="result-sub">Applicant does not meet credit criteria &nbsp;·&nbsp; Assessed: <strong>{timestamp}</strong></div>
             </div>""", unsafe_allow_html=True)
 
@@ -304,6 +315,7 @@ with tab2:
         st.markdown('<div class="card"><div class="card-title">⬇️ Export Prediction Report</div>', unsafe_allow_html=True)
 
         export_df = display_df.copy()
+        export_df.loc["Applicant Name"]    = st.session_state.get("applicant_name_input", "N/A")
         export_df.loc["─── Result ───"]    = "─────────"
         export_df.loc["Decision"]          = "Approved" if pred == 1 else "Rejected"
         export_df.loc["Model Confidence"]  = f"{confidence:.2f}%"
@@ -323,6 +335,52 @@ with tab2:
                 mime="text/csv"
             )
         st.markdown('</div>', unsafe_allow_html=True)
+
+# ── Footer ──────────────────────────────────────────────────────────────────
+st.markdown("""
+<div style="
+    background: linear-gradient(135deg, #0f2942 0%, #1a4a7a 100%);
+    border-radius: 16px;
+    padding: 1.5rem 2.5rem;
+    margin-top: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 4px 20px rgba(15,41,66,0.25);
+">
+    <div style="color: #a8c8f0; font-size: 0.85rem;">
+        Built by <strong style="color: white;">Denzel Tanatswa</strong> &nbsp;·&nbsp; Loan Approval Prediction System &nbsp;·&nbsp; Powered by Random Forest ML
+    </div>
+    <div style="display: flex; gap: 1rem;">
+        <a href="https://github.com/DenzelTanatswa" target="_blank" style="
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.25);
+            color: white;
+            text-decoration: none;
+            padding: 0.4rem 1.1rem;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        ">⚡ GitHub</a>
+        <a href="https://www.linkedin.com/in/denzel-chidzikwe-0a6965288/?skipRedirect=true" target="_blank" style="
+            background: #0a66c2;
+            border: 1px solid #0a66c2;
+            color: white;
+            text-decoration: none;
+            padding: 0.4rem 1.1rem;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        ">💼 LinkedIn</a>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ── Prediction logic ──────────────────────────────────────────────────────────
 if predict:
@@ -346,12 +404,13 @@ if predict:
     prediction  = model.predict(input_data)
     probability = model.predict_proba(input_data)
 
-    st.session_state.prediction_done = True
-    st.session_state.prediction      = int(prediction[0])
-    st.session_state.confidence      = float(max(probability[0])) * 100
-    st.session_state.prob_approve    = float(probability[0][1])
-    st.session_state.prob_reject     = float(probability[0][0])
-    st.session_state.input_df        = input_data
-    st.session_state.timestamp       = datetime.now().strftime("%d %b %Y, %H:%M:%S")
+    st.session_state.prediction_done    = True
+    st.session_state.prediction         = int(prediction[0])
+    st.session_state.confidence         = float(max(probability[0])) * 100
+    st.session_state.prob_approve       = float(probability[0][1])
+    st.session_state.prob_reject        = float(probability[0][0])
+    st.session_state.input_df           = input_data
+    st.session_state.timestamp          = datetime.now().strftime("%d %b %Y, %H:%M:%S")
+    st.session_state.applicant_name_input = applicant_name
 
     st.rerun()
