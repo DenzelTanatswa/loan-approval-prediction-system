@@ -1,0 +1,12 @@
+streamlit
+pandas
+numpy
+scikit-learn
+joblib
+matplotlib
+seaborn
+plotly 
+
+
+pip install -r requirements.txt
+streamlit run "Approval App/AppBuild.py"
